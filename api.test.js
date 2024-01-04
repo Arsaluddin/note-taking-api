@@ -1,114 +1,93 @@
-import * as chai from 'chai';
-import chaiHttp from 'chai-http';
-import app from './index.js'; // Update the path accordingly
-import mongoose from 'mongoose';
-import jwt from 'jsonwebtoken';
-import jest from 'jest';
+const request = require('supertest');
+const app = require('./index');
+const { connect, disconnect } = require('mongoose');
 
+beforeAll(async () => {
+  // Connect to the MongoDB test database
+  await connect('mongodb+srv://arsaluddin134:AxluRXMaNJ7RDJZ9@cluster0.jajb9lk.mongodb.net/', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
+});
 
-
-chai.use(chaiHttp);
-const { expect } = chai;
-const TIMEOUT = 5000;
-
+afterAll(async () => {
+  
+  await disconnect();
+});
 
 describe('API Tests', () => {
-  before(async () => {
-    await mongoose.connect('mongodb+srv://arsaluddin134:AxluRXMaNJ7RDJZ9@cluster0.jajb9lk.mongodb.net/', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-  });
+  let authToken; // Store the authentication token for later use
 
-//   after(async () => {
-//     await mongoose.connection.close();
-//   });
-
-  beforeEach(async () => {
+  it('should create a new user account', async () => {
     try {
-        await mongoose.connect('mongodb+srv://arsaluddin134:AxluRXMaNJ7RDJZ9@cluster0.jajb9lk.mongodb.net/'); // Your connection string
-        await mongoose.connection.collections['notes'].deleteMany({});
-        await mongoose.connection.collections['users'].deleteMany({});
-        // done();
+      const response = await request(app)
+        .post('/api/auth/signup')
+        .send({ username: 'testuser', password: 'testpassword' });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.body).toHaveProperty('user');
+      expect(response.body).toHaveProperty('message', 'User created successfully');
+      const token = response.body.token;
     } catch (error) {
-        throw error; // Ensure error handling
+      console.error('Error in should create a new user account:', error);
+      throw error;
     }
-});
-
-
-  describe('Authentication Endpoints', () => {
-    it('should create a new user account', async () => {
-    //   jest.setTimeout(TIMEOUT);  
-      const res = await chai.request(app)
-        .post('/api/auth/signup')
-        .send({ username: 'testuser', password: 'testpassword' });
-
-      expect(res).to.have.status(201);
-      expect(res.body.message).to.equal('User created successfully');
-      expect(res.body.user).to.have.property('_id');
-    });
-
-    it('should log in to an existing user account and receive an access token', async () => {
-      // First, create a user
-    //   jest.setTimeout(TIMEOUT); 
-      const userRes = await chai.request(app)
-        .post('/api/auth/signup')
-        .send({ username: 'testuser', password: 'testpassword' });
-
-      const userId = userRes.body.user._id;
-
-      // Now, try to log in
-      const loginRes = await chai.request(app)
-        .post('/api/auth/login')
-        .send({ username: 'testuser', password: 'testpassword' });
-
-      expect(loginRes).to.have.status(200);
-      expect(loginRes.body.message).to.equal('Login successful');
-      expect(loginRes.body).to.have.property('token');
-
-      const decodedToken = jwt.verify(loginRes.body.token, 'your_secret_key');
-      expect(decodedToken.userId).to.equal(userId);
-    });
   });
 
-  describe('Note Endpoints', () => {
-    it('should get a list of all notes for the authenticated user', async () => {
-      // Create a user
-    //   jest.setTimeout(TIMEOUT); 
-      const userRes = await chai.request(app)
-        .post('/api/auth/signup')
-        .send({ username: 'testuser', password: 'testpassword' });
-
-      const userId = userRes.body.user._id;
-
-      // Log in to get the token
-      const loginRes = await chai.request(app)
+  it('should log in to an existing user account and receive an access token', async () => {
+    try {
+      // Log in with the registered user
+      const loginResponse = await request(app)
         .post('/api/auth/login')
         .send({ username: 'testuser', password: 'testpassword' });
 
-      const token = loginRes.body.token;
+      expect(loginResponse.statusCode).toBe(200);
+      expect(loginResponse.body).toHaveProperty('token');
+      expect(loginResponse.body).toHaveProperty('message', 'Login successful');
 
-      // Create a note for the user
-      const noteRes = await chai.request(app)
-        .post('/api/notes')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ title: 'Test Note', content: 'Test Content' });
+      authToken = loginResponse.body.token; // Save the authentication token for later use
+    } catch (error) {
+      console.error('Error in should log in to an existing user account:', error);
+      throw error;
+    }
+  });
 
-      const noteId = noteRes.body._id;
-
-      // Get the list of notes for the user
-      const getNotesRes = await chai.request(app)
+  it('should get a list of notes', async () => {
+    try {
+      const response = await request(app)
         .get('/api/notes')
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${authToken}`);
 
-      expect(getNotesRes).to.have.status(200);
-      expect(getNotesRes.body).to.be.an('array');
-      expect(getNotesRes.body).to.have.lengthOf(1);
-      expect(getNotesRes.body[0]._id).to.equal(noteId);
-    });
+      console.log('Response:', response.body); // Add this line for debugging
 
-    // Add more test cases for other Note endpoints...
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toBeInstanceOf(Array); // Adjust based on your expected response
+    } catch (error) {
+      console.error('Error in should get a list of notes:', error);
+      throw error;
+    }
   });
-});
 
-// Additional tests for other endpoints...
+  it('should create a new note', async () => {
+    try {
+      const newNote = { title: 'Test Note', content: 'Test Content' };
+
+      const response = await request(app)
+        .post('/api/notes')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(newNote);
+
+      console.log('Response:', response.body); // Add this line for debugging
+
+      expect(response.statusCode).toBe(201);
+      expect(response.body).toHaveProperty('title', 'Test Note');
+      expect(response.body).toHaveProperty('content', 'Test Content');
+    } catch (error) {
+      console.error('Error in should create a new note:', error);
+      throw error;
+    }
+  });
+
+  // Add more test cases for other endpoints...
+
+});

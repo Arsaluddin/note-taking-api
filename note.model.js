@@ -1,6 +1,7 @@
 // note.model.js
 
-import mongoose from 'mongoose';
+// import mongoose from 'mongoose';
+const mongoose = require('mongoose')
 
 const { Schema, model } = mongoose;
 
@@ -16,5 +17,5 @@ noteSchema.index({ title: 'text', content: 'text' });
 
 const Note = model('Note', noteSchema);
 
-export default Note;
+// export default Note;
 

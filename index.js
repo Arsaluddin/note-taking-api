@@ -1,11 +1,11 @@
-import express from 'express';
-import bodyParser  from 'body-parser';
-import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
-import jsonwebtoken from 'jsonwebtoken';
-import Note from './note.model.js';
- // Import the Note model
-import rateLimit from 'express-rate-limit';
+
+const express = require('express');
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const jsonwebtoken = require('jsonwebtoken');
+const Note = require('./note.model.js');
+const rateLimit = require('express-rate-limit');
 
 const { json } = bodyParser;
 const { connect, connection, Schema, model } = mongoose;
@@ -18,7 +18,7 @@ const apiLimiter = rateLimit({
 });
 
 const app = express();
-export default app;
+module.exports = app;
 app.use(apiLimiter);
 // Middleware
 app.use(json());
